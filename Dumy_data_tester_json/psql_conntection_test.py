@@ -25,7 +25,8 @@ conn = connect_to_db(
 
 # Once connected, you can execute SQL queries:
 cur = conn.cursor()
-cur.execute("SELECT * FROM filefoldermetadata")
+#cur.execute("SELECT * FROM filefoldermetadata")
+cur.execute("SELECT * FROM filefoldermetadata WHERE type = 'music';")
 rows = cur.fetchall()
 for row in rows:
     print(row)
