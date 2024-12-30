@@ -1,0 +1,92 @@
+# Ignore compiled Python files
+__pycache__/*.pyc
+
+# Ignore environment-specific files
+.env
+
+# Ignore IDE-specific directories
+.idea/*
+.vscode/*
+.venv/*
+
+
+# Rust build output
+AesRust/target/*
+
+# Compiled library files
+*.rlib
+
+# Dependency directories
+**/Cargo.lock
+**/Cargo.toml
+
+# Configuration files for IDEs and editors
+/.vscode/
+/.idea/
+/*.swp
+
+# Rust specific files
+**/*.rs.bk
+*.bak
+
+# Rust generated docs
+/doc/
+/docs/
+
+# Node or other web frontend (if applicable)
+node_modules/
+
+
+# Python bytecode files
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# Distribution / packaging directories
+build/
+dist/
+*.egg-info/
+
+# Virtual environment directory (usually named venv or env)
+venv/
+env/
+.venv/
+
+# Test directories or files
+test_*.py
+tests/
+
+# IDE or editor specific files
+.vscode/
+.idea/
+*.swp
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs and databases
+*.log
+*.sqlite3
+*.db
+
+# Configuration files for other tools
+*.tox/
+*.coverage
+*.hypothesis/
+.coverage.*
+nosetests.xml
+*.coverage
+*.nox/
+*.pytest_cache/
+
+# Docker files (if not using Docker)
+Dockerfile
+docker-compose.yml
+
+# PyInstaller or other build systems
+*.spec
+
+# Backup files (e.g., Vim or Emacs backups)
+*.bak
+*.swp
