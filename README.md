@@ -7,10 +7,7 @@ This project provides CUDA-based implementations of AES encryption and decryptio
 1. [Project Overview](#project-overview)
 2. [Dependencies](#dependencies)
 3. [Build Instructions](#build-instructions)
-4. [Usage](#usage)
-5. [File Structure](#file-structure)
-6. [Cleaning Up](#cleaning-up)
-7. [License](#license)
+4. [File Structure](#file-structure)
 
 ---
 
