@@ -83,7 +83,7 @@ nosetests.xml
 # Docker files (if not using Docker)
 Dockerfile
 docker-compose.yml
-
+*target*
 # PyInstaller or other build systems
 *.spec
 

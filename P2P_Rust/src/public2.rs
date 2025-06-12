@@ -116,7 +116,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     swarm.behaviour_mut().gossipsub.subscribe(&chat_topic)?;
 
     let mut stdin = tokio::io::BufReader::new(tokio::io::stdin()).lines();
-    swarm.listen_on("/ip4/0.0.0.0/tcp/4002".parse()?)?;
+    swarm.listen_on("/ip4/0.0.0.0/tcp/4001".parse()?)?;
 
     if let Some(addr_str) = std::env::args().nth(1) {
         let remote: Multiaddr = addr_str.parse()?;
