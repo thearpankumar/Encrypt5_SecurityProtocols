@@ -1,156 +1,147 @@
 use futures::StreamExt;
 use libp2p::{
-    gossipsub,
-    identity,
-    mdns,
-    noise,
-    relay,
+    gossipsub, identity, kad, noise,
+    // The NetworkBehaviour derive macro is now brought in via the "macros" feature
     swarm::{NetworkBehaviour, SwarmEvent},
-    tcp,
-    yamux,
-    PeerId,
-    SwarmBuilder,
+    tcp, yamux, Multiaddr, PeerId, SwarmBuilder,
 };
+use serde::{Deserialize, Serialize};
 use std::error::Error;
-use tokio::{
-    io::{self, AsyncBufReadExt, AsyncWriteExt},
-    select,
-};
+use std::time::Duration;
+// FIX: We need `tokio::io` for `stdin` and `AsyncBufReadExt` for `.lines()`
+use tokio::io::{self, AsyncBufReadExt};
+use tokio::select;
 
-// Custom network behaviour combining Gossipsub, Mdns, and Relay
+// A simple message struct that we'll serialize and send.
+// libp2p's security layer will encrypt this for us automatically.
+#[derive(Serialize, Deserialize, Debug)]
+struct ChatMessage {
+    sender: String,
+    content: String,
+    sequence_number: u64,
+}
+
+// FIX: This derive will now work because of the "macros" feature in Cargo.toml
 #[derive(NetworkBehaviour)]
-#[behaviour(out_event = "ChatBehaviourEvent")]
+// The derive macro will generate a `ChatBehaviourEvent` enum for us.
+// We don't need to define it manually.
 struct ChatBehaviour {
     gossipsub: gossipsub::Behaviour,
-    mdns: mdns::tokio::Behaviour,
-    relay: relay::Behaviour,
-}
-
-#[derive(Debug)]
-enum ChatBehaviourEvent {
-    Gossipsub(gossipsub::Event),
-    Mdns(mdns::Event),
-    Relay(relay::Event),
-}
-
-// Implement From traits for ChatBehaviourEvent to satisfy NetworkBehaviour
-impl From<gossipsub::Event> for ChatBehaviourEvent {
-    fn from(event: gossipsub::Event) -> Self {
-        ChatBehaviourEvent::Gossipsub(event)
-    }
-}
-
-impl From<mdns::Event> for ChatBehaviourEvent {
-    fn from(event: mdns::Event) -> Self {
-        ChatBehaviourEvent::Mdns(event)
-    }
-}
-
-impl From<relay::Event> for ChatBehaviourEvent {
-    fn from(event: relay::Event) -> Self {
-        ChatBehaviourEvent::Relay(event)
-    }
+    kademlia: kad::Behaviour<kad::store::MemoryStore>,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // Create a random PeerId
-    let id_keys = identity::Keypair::generate_ed25519();
-    let local_peer_id = PeerId::from(id_keys.public());
+    env_logger::init();
+
+    let local_key = identity::Keypair::generate_ed25519();
+    let local_peer_id = PeerId::from(local_key.public());
     println!("✅ Local peer id: {local_peer_id}");
 
-    // Create a Gossipsub topic
-    let topic = gossipsub::IdentTopic::new("chat-room");
-
-    // Create a Swarm to manage peers and events
-    let behaviour = ChatBehaviour {
-        gossipsub: gossipsub::Behaviour::new(
-            gossipsub::MessageAuthenticity::Signed(id_keys.clone()),
-            gossipsub::Config::default(),
-        )?,
-        mdns: mdns::tokio::Behaviour::new(mdns::Config::default(), local_peer_id)?,
-        relay: relay::Behaviour::new(local_peer_id, relay::Config::default()),
-    };
-
-    let mut swarm = SwarmBuilder::with_existing_identity(id_keys)
+    let mut swarm = SwarmBuilder::with_existing_identity(local_key.clone())
         .with_tokio()
         .with_tcp(
             tcp::Config::default(),
             noise::Config::new,
             yamux::Config::default,
         )?
-        .with_behaviour(|_| behaviour)?
+        // FIX: The closure now directly returns the behaviour struct, not a Result.
+        // This satisfies the trait bounds because the operations inside use `.expect()`.
+        .with_behaviour(|key| {
+            let message_authenticity = gossipsub::MessageAuthenticity::Signed(key.clone());
+
+            let gossipsub_config = gossipsub::ConfigBuilder::default()
+                .heartbeat_interval(Duration::from_secs(10))
+                .validation_mode(gossipsub::ValidationMode::Strict)
+                .build()
+                .expect("Valid gossipsub config");
+
+            let gossipsub = gossipsub::Behaviour::new(message_authenticity, gossipsub_config)
+                .expect("Couldn't build gossipsub");
+
+            let kademlia =
+                kad::Behaviour::new(local_peer_id, kad::store::MemoryStore::new(local_peer_id));
+
+            // Directly return the struct.
+            ChatBehaviour { gossipsub, kademlia }
+        })?
+        .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
         .build();
 
-    // Listen on all interfaces with a fixed port for public IP access
-    swarm.listen_on("/ip4/0.0.0.0/tcp/4001".parse()?)?;
-
-    // Connect to a bootstrap node if provided (for public IP or relay)
-    if let Some(addr) = std::env::args().nth(1) {
-        let remote: libp2p::Multiaddr = addr.parse()?;
-        swarm.dial(remote.clone())?;
-        println!("📞 Dialed bootstrap peer at {addr}");
-    }
-
-    let mut stdin = io::BufReader::new(io::stdin()).lines();
-
-    // Subscribe to the chat topic
+    let topic = gossipsub::IdentTopic::new("public-chat");
+    // FIX: This now works because the derive macro created the `.gossipsub` field.
     swarm.behaviour_mut().gossipsub.subscribe(&topic)?;
 
-    println!("🚀 Chat client started. Enter messages to send.");
-    println!("ℹ️ For public IP, ensure port 4001 is forwarded on your router.");
+    swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
 
-    // The main event loop
+    if let Some(addr_str) = std::env::args().nth(1) {
+        let remote: Multiaddr = addr_str.parse()?;
+        swarm.dial(remote)?;
+        println!("📞 Dialed bootstrap peer at {addr_str}");
+    }
+
+    println!("🚀 Secure chat client started. Enter messages to send.");
+
+    let mut stdin = tokio::io::BufReader::new(tokio::io::stdin()).lines();
+    let mut sequence_number: u64 = 0;
+
     loop {
         select! {
-            // Handle user input from the terminal
             line = stdin.next_line() => {
-                let line = line?.expect("stdin closed");
+                let line = line?.unwrap_or_default();
+                if line.is_empty() { continue; }
+
+                sequence_number += 1;
+                let chat_message = ChatMessage {
+                    sender: local_peer_id.to_string(),
+                    content: line,
+                    sequence_number,
+                };
+
+                let json = serde_json::to_string(&chat_message)?;
+
                 if let Err(e) = swarm
                     .behaviour_mut()
                     .gossipsub
-                    .publish(topic.clone(), line.as_bytes())
+                    .publish(topic.clone(), json.as_bytes())
                 {
-                    println!("❌ Publish error: {e:?}");
+                    eprintln!("❌ Publish error: {e:?}");
                 }
-            }
-            // Handle events from the swarm
+            },
             event = swarm.select_next_some() => {
                 match event {
                     SwarmEvent::NewListenAddr { address, .. } => {
-                        println!("👂 Listening on {address}");
+                        println!("👂 Listening on {}", address.with_p2p(local_peer_id).unwrap());
                     }
+                    SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                        println!("🤝 Connection established with {peer_id}");
+                    }
+                    // FIX: This now works because the derive macro generated `ChatBehaviourEvent`.
                     SwarmEvent::Behaviour(ChatBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                         propagation_source: peer_id,
                         message,
                         ..
                     })) => {
-                        print!("\r                       \r"); // Clear line
-                        println!(
-                            "📨 {}: {}",
-                            peer_id,
-                            String::from_utf8_lossy(&message.data),
-                        );
-                        print!("> ");
-                        tokio::io::stdout().flush().await?;
-                    }
-                    SwarmEvent::Behaviour(ChatBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
-                        for (peer_id, _multiaddr) in list {
-                            println!("[mdns] Discovered peer: {peer_id}");
-                            swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                        match serde_json::from_slice::<ChatMessage>(&message.data) {
+                            Ok(msg) => {
+                                println!(
+                                    "📨 [{}] (from {}): {}",
+                                    msg.sender,
+                                    peer_id,
+                                    msg.content
+                                );
+                            }
+                            Err(_) => {
+                                println!(
+                                    "📨 Received raw message from {}: {}",
+                                    peer_id,
+                                    String::from_utf8_lossy(&message.data)
+                                );
+                            }
                         }
                     }
-                    SwarmEvent::Behaviour(ChatBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
-                        for (peer_id, _multiaddr) in list {
-                            println!("[mdns] Expired peer: {peer_id}");
-                            swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
-                        }
-                    }
-                    SwarmEvent::Behaviour(ChatBehaviourEvent::Relay(relay::Event::ReservationReqAccepted { .. })) => {
-                        println!("[relay] Reservation request accepted");
-                    }
-                    SwarmEvent::ConnectionEstablished { peer_id, .. } => {
-                        println!("🤝 Connection established with {peer_id}");
+                    SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
+                        println!("🔌 Connection lost with {peer_id}: {:?}", cause);
                     }
                     _ => {}
                 }
