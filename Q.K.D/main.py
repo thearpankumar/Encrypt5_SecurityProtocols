@@ -49,7 +49,7 @@ DEMO 3 - Encryption Example:
   Plaintext: This is a secret message protected by quantum cryptography!
   Ciphertext (hex): ef9863914d591d15511269a4c9c9a9837f0df2f38e688172234b366682fa7097...
   IV (hex): 52357cf196d52500b648510533184535
-  Decryption: SUCCESS ✓
+  Decryption: SUCCESS 
 """
 
 
@@ -112,7 +112,7 @@ class QuKayDeeClient:
         for file in required_files:
             if not Path(file).exists():
                 raise FileNotFoundError(f"Certificate file not found: {file}")
-        print(f"✓ All certificates found for {self.sae_id}")
+        print(f" All certificates found for {self.sae_id}")
 
     def connect(self):
         """Establish connection to QuKayDee QKD server."""
@@ -128,11 +128,11 @@ class QuKayDeeClient:
             if self.force_insecure:
                 print(f"⚠ SSL verification disabled")
             else:
-                print(f"✓ Secure connection established (SSL verified)")
-            print(f"✓ Connected to QuKayDee as {self.sae_id}")
+                print(f" Secure connection established (SSL verified)")
+            print(f" Connected to QuKayDee as {self.sae_id}")
             return True
         except Exception as e:
-            print(f"✗ Connection failed: {e}")
+            print(f" Connection failed: {e}")
             raise QKDClientException(f"Failed to connect: {e}")
 
     def get_status(self, slave_sae_id: str):
@@ -152,14 +152,14 @@ class QuKayDeeClient:
             status_code, status_data = self.client.get_status(slave_sae_id)
 
             if status_code != 200:
-                print(f"✗ Status request failed with code {status_code}")
+                print(f" Status request failed with code {status_code}")
                 if isinstance(status_data, DataError):
                     raise QKDClientException(f"Error: {status_data}")
 
-            print(f"✓ Status retrieved for {self.sae_id}")
+            print(f" Status retrieved for {self.sae_id}")
             return status_data
         except Exception as e:
-            print(f"✗ Failed to get status: {e}")
+            print(f" Failed to get status: {e}")
             raise
 
     def get_key(self, slave_sae_id: str, size: int = None, number: int = None):
@@ -184,7 +184,7 @@ class QuKayDeeClient:
             )
 
             if status_code != 200:
-                print(f"✗ Key request failed with code {status_code}")
+                print(f" Key request failed with code {status_code}")
                 if isinstance(key_container, DataError):
                     raise QKDClientException(f"Error: {key_container}")
 
@@ -193,12 +193,12 @@ class QuKayDeeClient:
                 raise QKDClientException("No keys returned from server")
 
             first_key = key_container.keys[0]
-            print(f"✓ Key retrieved: Key ID: {first_key.key_id}")
+            print(f" Key retrieved: Key ID: {first_key.key_id}")
 
             # Return a dict for compatibility with demo code
             return {"key_ID": first_key.key_id, "key": first_key.key}
         except Exception as e:
-            print(f"✗ Failed to get key: {e}")
+            print(f" Failed to get key: {e}")
             raise
 
     def get_key_with_id(self, master_sae_id: str, key_id: str):
@@ -222,7 +222,7 @@ class QuKayDeeClient:
             )
 
             if status_code != 200:
-                print(f"✗ Key retrieval failed with code {status_code}")
+                print(f" Key retrieval failed with code {status_code}")
                 if isinstance(key_container, DataError):
                     raise QKDClientException(f"Error: {key_container}")
 
@@ -231,12 +231,12 @@ class QuKayDeeClient:
                 raise QKDClientException("No keys returned from server")
 
             first_key = key_container.keys[0]
-            print(f"✓ Key retrieved with ID: {key_id}")
+            print(f" Key retrieved with ID: {key_id}")
 
             # Return a dict for compatibility with demo code
             return {"key_ID": first_key.key_id, "key": first_key.key}
         except Exception as e:
-            print(f"✗ Failed to get key with ID: {e}")
+            print(f" Failed to get key with ID: {e}")
             raise
 
 
@@ -301,11 +301,11 @@ def demonstrate_qkd_peer_to_peer():
 
         # Verify both keys match
         if key1.get("key") == key2.get("key"):
-            print("✓ SUCCESS: Both Alice and Bob have the same quantum key!")
+            print(" SUCCESS: Both Alice and Bob have the same quantum key!")
             print(f"\nShared Key ID: {key_id}")
             print(f"Key matches: {key1.get('key') == key2.get('key')}")
         else:
-            print("✗ ERROR: Keys do not match!")
+            print(" ERROR: Keys do not match!")
 
         return key1, key2
 
@@ -352,7 +352,7 @@ def demonstrate_qkd_encryption():
         padded = plaintext + b" " * (16 - len(plaintext) % 16)
         ciphertext = encryptor.update(padded) + encryptor.finalize()
 
-        print("✓ Alice encrypted the message successfully.")
+        print(" Alice encrypted the message successfully.")
         print(f"Key ID used: {key_id}")
         print(f"Plaintext: {plaintext.decode()}")
         print(f"Ciphertext (hex): {ciphertext.hex()}")
@@ -364,10 +364,10 @@ def demonstrate_qkd_encryption():
 
         # Verify Alice and Bob have the same key
         if alice_key != bob_key:
-            print("✗ CRITICAL ERROR: Alice's and Bob's keys do not match!")
+            print(" CRITICAL ERROR: Alice's and Bob's keys do not match!")
             return
         else:
-            print("✓ Bob has successfully retrieved the same quantum key.")
+            print(" Bob has successfully retrieved the same quantum key.")
 
         # 4. Bob uses his key to decrypt the message
         print("\n--- Bob: Decrypting message from Alice ---")
@@ -381,13 +381,13 @@ def demonstrate_qkd_encryption():
         decrypted = decrypted_padded.strip()
 
         # 5. Verification
-        print(f"✓ Bob decrypted the message successfully.")
+        print(f" Bob decrypted the message successfully.")
         print(f"Decrypted message: {decrypted.decode()}")
 
         if decrypted == plaintext:
-            print("\n✓ SUCCESS: Decrypted message matches original plaintext!")
+            print("\n SUCCESS: Decrypted message matches original plaintext!")
         else:
-            print("\n✗ FAILURE: Decrypted message does not match original plaintext!")
+            print("\n FAILURE: Decrypted message does not match original plaintext!")
 
     except ImportError:
         print("cryptography library not installed. Skipping encryption demo.")
