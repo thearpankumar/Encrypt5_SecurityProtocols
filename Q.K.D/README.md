@@ -375,6 +375,46 @@ graph TD
 
 ---
 
+### Demo 4: Eavesdropping & Key Destruction
+
+**What it does:** Shows that if an eavesdropper (Eve) intercepts a key, it is effectively destroyed and cannot be retrieved by the legitimate recipient (Bob).
+
+```mermaid
+sequenceDiagram
+    participant Alice as Alice (SAE-1)
+    participant KME as KME / Quantum Store
+    participant Eve as Eve (impersonating Bob)
+    participant Bob as Bob (the real SAE-2)
+
+    Alice->>KME: get_key(for_bob)
+    KME-->>Alice: Key ID: xyz-456
+
+    note over Alice, Bob: Eve has stolen Bob's credentials<br/>and intercepted the Key ID.
+
+    Eve->>KME: get_key_with_id("xyz-456")
+    KME-->>Eve: Key Material (XYZ)
+    note over KME: Key "xyz-456" is now<br/>considered used/destroyed.
+
+    Bob->>KME: get_key_with_id("xyz-456")
+    KME-->>Bob: 🚨 ERROR: Key Not Found!
+
+    rect rgb(255, 182, 193)
+        note over Bob, KME: ✓ SUCCESSFUL DETECTION<br/>Bob is denied access, indicating<br/>the key was compromised.
+    end
+```
+
+**Key Insight:**
+
+This simulation demonstrates the "one-time-use" nature of the quantum keys, which is the API-level equivalent of the "observer effect" in quantum physics. 
+
+- The KME will only deliver a specific key **once**.
+- Once Eve retrieves the key (by impersonating Bob), the KME deletes its copy.
+- When the real Bob tries to get the key, it's already gone. The failure signals that the channel was compromised.
+
+This is a powerful security feature that prevents key reuse and makes eavesdropping attempts detectable.
+
+---
+
 ## 🔍 Code Structure
 
 ### Main Components

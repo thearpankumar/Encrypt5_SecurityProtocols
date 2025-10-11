@@ -403,6 +403,59 @@ def demonstrate_qkd_encryption():
         print(f"Encryption demo failed: {e}")
 
 
+def demonstrate_key_destruction():
+    """Demonstrate that a key is 'destroyed' after a single retrieval."""
+    print("\n" + "=" * 60)
+    print("DEMO 4: Key Destruction after Eavesdropping")
+    print("=" * 60)
+    print("Scenario: Eve steals Bob's credentials to intercept the key.")
+    print("Hypothesis: A key can only be retrieved once. Bob's attempt should fail.")
+
+    try:
+        # 1. Initialize clients for all parties
+        alice = QuKayDeeClient(sae_id="sae-1")
+        # "Eve" will use Bob's credentials to impersonate him
+        eve_as_bob = QuKayDeeClient(sae_id="sae-2")
+        # The real Bob
+        bob = QuKayDeeClient(sae_id="sae-2")
+
+        # 2. Alice requests a shared key for Bob
+        print("\n--- Alice: Requesting a shared key for Bob ---")
+        alice.connect()
+        alice_key_data = alice.get_key(slave_sae_id="sae-2", size=256)
+        key_id = alice_key_data.get("key_ID")
+        print(f"Alice requested key with ID: {key_id} for Bob.")
+
+        # 3. Eve (impersonating Bob) intercepts the key first
+        print("\n--- Eve's Interception (as Bob) ---")
+        eve_as_bob.connect()
+        eve_key_data = eve_as_bob.get_key_with_id(master_sae_id="sae-1", key_id=key_id)
+        print("Eve successfully intercepted the key by impersonating Bob.")
+        print(f"Intercepted Key (base64): {eve_key_data.get('key')[:32]}...")
+
+
+        # 4. The real Bob now tries to retrieve the same key
+        print("\n--- Bob's Attempt (Legitimate User) ---")
+        try:
+            bob.connect()
+            # This call should fail if the key is single-use
+            bob.get_key_with_id(master_sae_id="sae-1", key_id=key_id)
+            # If this line is reached, the hypothesis is wrong
+            print("\nDEMO RESULT: FAILURE")
+            print("Bob was able to retrieve the key, meaning it is NOT single-use.")
+            print("The eavesdropping was not detected by this mechanism.")
+
+        except QKDClientException as e:
+            # We expect an exception here, which proves the key was destroyed.
+            print("\nDEMO RESULT: SUCCESS")
+            print("Bob's attempt to get the key failed as expected.")
+            print("This demonstrates the key was 'destroyed' after Eve's interception.")
+            print(f"Server Error: {e}")
+
+    except Exception as e:
+        print(f"Key destruction demo failed: {e}")
+
+
 def main():
     """Main entry point for QKD demonstrations."""
     print("QuKayDee QKD Client - Sample Implementation")
@@ -417,6 +470,9 @@ def main():
 
         # Demo 3: Using QKD keys for encryption
         demonstrate_qkd_encryption()
+
+        # Demo 4: Key Destruction after Eavesdropping
+        demonstrate_key_destruction()
 
         print("\n" + "=" * 60)
         print("All demonstrations completed!")
