@@ -48,6 +48,7 @@
 | `GPU_compression/`             | GPU-accelerated data compression utilities to maximize storage and transmission efficiency.                   | CUDA               |
 | `Jwt/`                         | JWT-based authentication and authorization modules.                                                            | Python             |
 | `P2P_Rust/`                    | Peer-to-peer networking stack for decentralized, secure communication.                                         | Rust               |
+| `Q.K.D/`                       | Q.K.D implementation + quantum safe                                                                            | Python             |
 
 ---
 
