@@ -1,0 +1,3 @@
+etsi-qkd-014-client
+cryptography
+requests
