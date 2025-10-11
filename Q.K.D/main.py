@@ -97,7 +97,14 @@ class QuKayDeeClient:
             self.key_file = f"{sae_id}.key"
 
         # Use the QuKayDee server CA certificate for proper SSL verification
-        self.ca_file = "account-2764-server-ca-qukaydee-com.crt"
+        ca_files = list(Path(".").glob("*-server-ca-qukaydee-com.crt"))
+        if not ca_files:
+            raise FileNotFoundError(
+                "Server CA certificate ('*-server-ca-qukaydee-com.crt') not found."
+            )
+        if len(ca_files) > 1:
+            print(f"Warning: Multiple server CA files found, using {ca_files[0]}")
+        self.ca_file = str(ca_files[0])
 
         # Verify certificate files exist
         self._verify_certificates()
